@@ -1,0 +1,13 @@
+
+spring:
+  application:
+    name: FoodApp
+
+  profiles:
+    active: dev   # default profile (local development)
+
+  config:
+    import: optional:file:.env[.properties]   # load local .env for development
+
+  server:
+    port: 8090
