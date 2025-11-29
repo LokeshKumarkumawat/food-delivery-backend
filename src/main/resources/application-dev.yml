@@ -36,3 +36,11 @@ spring:
           starttls:
             enable: true
             required: true
+
+aws:
+  s3:
+    region: ap-south-1
+    bucket: food-bytebyteboot-dev
+
+  accessKeyId: ${AWS_ACCESS_KEY_ID}
+  secretKey: ${AWS_SECRET_KEY}
