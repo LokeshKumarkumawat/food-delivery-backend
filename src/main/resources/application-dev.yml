@@ -44,3 +44,15 @@ aws:
 
   accessKeyId: ${AWS_ACCESS_KEY_ID}
   secretKey: ${AWS_SECRET_KEY}
+
+
+
+
+## LOCAL REACT FRONTEND
+frontend:
+  base:
+    url: http://localhost:3000
+
+base:
+  payment:
+    link: http://localhost:3000/pay?orderid=
