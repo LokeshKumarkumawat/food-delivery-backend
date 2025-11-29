@@ -11,3 +11,6 @@ spring:
 
 server:
   port: 8090
+
+
+secreteJwtString: ${SECRETE_JWT_STRING}
