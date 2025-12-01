@@ -37,6 +37,21 @@ spring:
             enable: true
             required: true
 
+
+
+  redis:
+    host: localhost
+    port: 6379
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000   # 600000 ms = 10 minutes
+
+
+
+
+
 aws:
   s3:
     region: ap-south-1
@@ -65,3 +80,6 @@ stripe:
       key: ${STRIPE_PUBLIC_KEY}
     secret:
       key: ${STRIPE_SECRET_KEY}
+
+
+
