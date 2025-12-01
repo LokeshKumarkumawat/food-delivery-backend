@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+
+  redis:
+    image: redis:7.4.2
+    container_name: redis-server
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    networks:
+      - app-network
+
+  redis-cli:
+    image: redis:7.4.2
+    container_name: redis-cli
+    depends_on:
+      - redis
+    entrypoint: ["redis-cli", "-h", "redis"]
+    stdin_open: true
+    tty: true
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

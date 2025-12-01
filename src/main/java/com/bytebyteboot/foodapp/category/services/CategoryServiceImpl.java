@@ -8,6 +8,9 @@ import com.bytebyteboot.foodapp.response.Response;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +26,11 @@ public class CategoryServiceImpl implements CategoryService {
     private final ModelMapper modelMapper;
 
 
+
     @Override
+    @Caching(evict = {
+            @CacheEvict(value = "categories", allEntries = true)
+    })
     public Response<CategoryDTO> addCategory(CategoryDTO categoryDTO) {
 
         log.info("Inside addCategory()");
@@ -41,6 +48,10 @@ public class CategoryServiceImpl implements CategoryService {
 
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(value = "categories", allEntries = true),
+            @CacheEvict(value = "menuById", key = "#categoryDTO.id")
+    })
     public Response<CategoryDTO> updateCategory(CategoryDTO categoryDTO) {
 
         log.info("Inside updateCategory()");
@@ -62,9 +73,12 @@ public class CategoryServiceImpl implements CategoryService {
 
 
     @Override
+    @Cacheable(value = "categories", key = "#id")
     public Response<CategoryDTO> getCategoryById(Long id) {
 
         log.info("Inside getCategoryById()");
+
+        log.info("[DB HIT] Fetching category from database for ID: {}", id);
 
 
         Category category = categoryRepository.findById(id)
@@ -81,6 +95,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
+    @Cacheable(value = "categories", key = "'all'")
     public Response<List<CategoryDTO>> getAllCategories() {
 
         log.info("Inside getAllCategories()");
@@ -99,6 +114,9 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(value = "categories", allEntries = true)
+    })
     public Response<?> deleteCategory(Long id) {
 
         log.info("Inside deleteCategory()");

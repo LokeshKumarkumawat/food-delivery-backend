@@ -17,6 +17,9 @@ import com.bytebyteboot.foodapp.review.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +42,11 @@ public class ReviewServiceImpl implements ReviewService {
 
     @Override
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "reviews", allEntries = true),
+            @CacheEvict(value = "averageRating", key = "#reviewDTO.menuId"),
+            @CacheEvict(value = "menuById", key = "#reviewDTO.menuId")
+    })
     public Response<ReviewDTO> createReview(ReviewDTO reviewDTO) {
 
         log.info("Inside createReview()");
@@ -113,6 +121,7 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
+    @Cacheable(value = "reviews", key = "#menuId")
     public Response<List<ReviewDTO>> getReviewsForMenu(Long menuId) {
         log.info("Inside getReviewsForMenu()");
 
@@ -131,6 +140,7 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
+    @Cacheable(value = "averageRating", key = "#menuId")
     public Response<Double> getAverageRating(Long menuId) {
         log.info("Inside getAverageRating()");
 

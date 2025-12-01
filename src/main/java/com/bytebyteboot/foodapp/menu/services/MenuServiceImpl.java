@@ -14,6 +14,9 @@ import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -39,6 +42,9 @@ public class MenuServiceImpl implements MenuService{
 
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(value = "menus", allEntries = true)
+    })
     public Response<MenuDTO> createMenu(MenuDTO menuDTO) {
 
         log.info("Inside createMenu()");
@@ -76,6 +82,10 @@ public class MenuServiceImpl implements MenuService{
     }
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(value = "menus", allEntries = true),
+            @CacheEvict(value = "menuById", key = "#menuDTO.id")
+    })
     public Response<MenuDTO> updateMenu(MenuDTO menuDTO) {
 
 
@@ -125,6 +135,7 @@ public class MenuServiceImpl implements MenuService{
     }
 
     @Override
+    @Cacheable(value = "menuById", key = "#id")
     public Response<MenuDTO> getMenuById(Long id) {
 
         log.info("Inside getMenuById()");
@@ -147,6 +158,10 @@ public class MenuServiceImpl implements MenuService{
     }
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(value = "menus", allEntries = true),
+            @CacheEvict(value = "menuById", key = "#id")
+    })
     public Response<?> deleteMenu(Long id) {
 
         log.info("Inside deleteMenu()");
@@ -170,6 +185,7 @@ public class MenuServiceImpl implements MenuService{
     }
 
     @Override
+    @Cacheable(value = "menus", key = "#categoryId + '-' + #search")
     public Response<List<MenuDTO>> getMenus(Long categoryId, String search) {
 
         log.info("Inside getMenus()");
