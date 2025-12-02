@@ -82,4 +82,21 @@ stripe:
       key: ${STRIPE_SECRET_KEY}
 
 
+# Rate Limiter Configuration
+rate:
+  limit:
+    general-capacity: 100
+    general-refill-rate: 100
+
+    auth-capacity: 3
+    auth-refill-rate: 3
+
+    write-capacity: 20
+    write-refill-rate: 20
+
+    admin-capacity: 50
+    admin-refill-rate: 50
+
+    upload-capacity: 10
+    upload-refill-rate: 10
 

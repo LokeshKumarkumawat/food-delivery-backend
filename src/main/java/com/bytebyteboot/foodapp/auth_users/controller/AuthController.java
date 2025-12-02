@@ -4,6 +4,8 @@ import com.bytebyteboot.foodapp.auth_users.dtos.LoginRequest;
 import com.bytebyteboot.foodapp.auth_users.dtos.LoginResponse;
 import com.bytebyteboot.foodapp.auth_users.dtos.RegistrationRequest;
 import com.bytebyteboot.foodapp.auth_users.services.AuthService;
+import com.bytebyteboot.foodapp.ratelimiter.RateLimit;
+import com.bytebyteboot.foodapp.ratelimiter.RateLimitType;
 import com.bytebyteboot.foodapp.response.Response;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,11 +25,13 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
+    @RateLimit(type = RateLimitType.AUTH)
     public ResponseEntity<Response<?>> register(@Valid @RequestBody RegistrationRequest registrationRequest) {
         return ResponseEntity.ok(authService.register(registrationRequest));
     }
 
     @PostMapping("/login")
+    @RateLimit(type = RateLimitType.AUTH)
     public ResponseEntity<Response<LoginResponse>> login(@Valid @RequestBody LoginRequest loginRequest) {
         return ResponseEntity.ok(authService.login(loginRequest));
     }
