@@ -2,6 +2,8 @@ package com.bytebyteboot.foodapp.cart.controller;
 
 import com.bytebyteboot.foodapp.cart.dtos.CartDTO;
 import com.bytebyteboot.foodapp.cart.services.CartService;
+import com.bytebyteboot.foodapp.ratelimiter.RateLimit;
+import com.bytebyteboot.foodapp.ratelimiter.RateLimitType;
 import com.bytebyteboot.foodapp.response.Response;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -15,32 +17,38 @@ public class CartController {
     private final CartService cartService;
 
     @PostMapping("/items")
+    @RateLimit(type = RateLimitType.WRITE)
     public ResponseEntity<Response<?>> addItemToCart(@RequestBody CartDTO cartDTO){
         return ResponseEntity.ok(cartService.addItemToCart(cartDTO));
     }
 
     @PutMapping("/items/increment/{menuId}")
+    @RateLimit(type = RateLimitType.WRITE)
     public ResponseEntity<Response<?>> incrementItem(@PathVariable Long menuId){
         return ResponseEntity.ok(cartService.incrementItem(menuId));
     }
 
     @PutMapping("/items/decrement/{menuId}")
+    @RateLimit(type = RateLimitType.WRITE)
     public ResponseEntity<Response<?>> decrementItem(@PathVariable Long menuId){
         return ResponseEntity.ok(cartService.decrementItem(menuId));
     }
 
     @DeleteMapping("/items/{cartItemId}")
+    @RateLimit(type = RateLimitType.WRITE)
     public ResponseEntity<Response<?>> removeItem(@PathVariable Long cartItemId){
         return ResponseEntity.ok(cartService.removeItem(cartItemId));
     }
 
 
     @GetMapping
+    @RateLimit(type = RateLimitType.GENERAL)
     public ResponseEntity<Response<CartDTO>> getShoppingCart(){
         return ResponseEntity.ok(cartService.getShoppingCart());
     }
 
     @DeleteMapping
+    @RateLimit(type = RateLimitType.WRITE)
     public ResponseEntity<Response<?>> clearShoppingCart(){
         return ResponseEntity.ok(cartService.clearShoppingCart());
     }

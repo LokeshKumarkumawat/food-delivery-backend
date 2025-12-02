@@ -1,12 +1,14 @@
 package com.bytebyteboot.foodapp.exceptions;
 
 import com.bytebyteboot.foodapp.response.Response;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 @ControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
@@ -70,6 +72,18 @@ public class GlobalExceptionHandler {
                 .message(ex.getMessage())
                 .build();
         return  new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<Response<?>> handleRateLimitExceeded(RateLimitExceededException ex) {
+        log.warn("Rate limit exceeded: {}", ex.getMessage());
+
+        Response<?> response = Response.builder()
+                .statusCode(HttpStatus.TOO_MANY_REQUESTS.value())
+                .message(ex.getMessage())
+                .build();
+
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(response);
     }
 
 }

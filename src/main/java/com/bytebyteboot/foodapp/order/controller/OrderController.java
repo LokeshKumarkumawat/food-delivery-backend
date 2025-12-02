@@ -4,6 +4,8 @@ import com.bytebyteboot.foodapp.enums.OrderStatus;
 import com.bytebyteboot.foodapp.order.dtos.OrderDTO;
 import com.bytebyteboot.foodapp.order.dtos.OrderItemDTO;
 import com.bytebyteboot.foodapp.order.services.OrderService;
+import com.bytebyteboot.foodapp.ratelimiter.RateLimit;
+import com.bytebyteboot.foodapp.ratelimiter.RateLimitType;
 import com.bytebyteboot.foodapp.response.Response;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,17 +24,20 @@ public class OrderController {
 
     @PostMapping("/checkout")
     @PreAuthorize("hasAuthority('CUSTOMER')")
+    @RateLimit(type = RateLimitType.WRITE)
     public ResponseEntity<Response<?>> checkout(){
         return ResponseEntity.ok(orderService.placeOrderFromCart());
     }
 
     @GetMapping("/{id}")
+    @RateLimit(type = RateLimitType.GENERAL)
     public ResponseEntity<Response<OrderDTO>> getOrderById(@PathVariable Long id){
         return ResponseEntity.ok(orderService.getOrderById(id));
     }
 
 
     @GetMapping("/me")
+    @RateLimit(type = RateLimitType.GENERAL)
     public ResponseEntity<Response<List<OrderDTO>>> getMyOrders(){
         return ResponseEntity.ok(orderService.getOrdersOfUser());
     }
@@ -45,6 +50,7 @@ public class OrderController {
 
     @GetMapping("/all")
     @PreAuthorize("hasAuthority('ADMIN')")
+    @RateLimit(type = RateLimitType.ADMIN)
     public ResponseEntity<Response<Page<OrderDTO>>> getAllOrders(
             @RequestParam(required = false) OrderStatus orderStatus,
             @RequestParam(defaultValue = "0") int page,
@@ -55,6 +61,7 @@ public class OrderController {
 
     @PutMapping("/update")
     @PreAuthorize("hasAuthority('ADMIN')")
+    @RateLimit(type = RateLimitType.ADMIN)
     public ResponseEntity<Response<OrderDTO>> updateOrderStatus(@RequestBody OrderDTO orderDTO) {
         return ResponseEntity.ok(orderService.updateOrderStatus(orderDTO));
     }
@@ -62,6 +69,7 @@ public class OrderController {
 
     @GetMapping("/unique-customers")
     @PreAuthorize("hasAuthority('ADMIN')")
+    @RateLimit(type = RateLimitType.ADMIN)
     public ResponseEntity<Response<Long>> countUniqueCustomers() {
         return ResponseEntity.ok(orderService.countUniqueCustomers());
     }
