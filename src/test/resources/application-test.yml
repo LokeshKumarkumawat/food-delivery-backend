@@ -1,0 +1,94 @@
+# =============== TEST PROFILE ===============
+
+spring:
+  application:
+    name: FoodApp-Test
+
+  # ---- H2 Database for Testing ----
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  # ---- Flyway Disabled for Tests (Recommended) ----
+  flyway:
+    enabled: false
+
+  # ---- Redis for Testing ----
+  redis:
+    host: localhost
+    port: 6370    # test Redis container OR local test port
+
+  cache:
+    type: redis
+
+  # ---- Disable Security During Tests ----
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+
+  # ---- Mock Email ----
+  mail:
+    host: localhost
+    port: 3025   # MailHog / GreenMail test servers
+
+
+# ---- MOCK AWS CONFIG ----
+aws:
+  s3:
+    region: us-east-1   # dummy value
+    bucket: test-bucket
+
+  accessKeyId: test
+  secretKey: test
+
+
+# ---- Disable Stripe for tests ----
+stripe:
+  api:
+    public:
+      key: test-public
+    secret:
+      key: test-secret
+
+
+# ---- Mock Frontend URL ----
+frontend:
+  base:
+    url: http://localhost:3000
+
+base:
+  payment:
+    link: http://localhost:3000/pay?orderid=
+
+
+# ---- Rate Limits for Testing (High) ----
+rate:
+  limit:
+    general-capacity: 1000
+    general-refill-rate: 1000
+
+    auth-capacity: 100
+    auth-refill-rate: 100
+
+    write-capacity: 200
+    write-refill-rate: 200
+
+    admin-capacity: 500
+    admin-refill-rate: 500
+
+    upload-capacity: 100
+    upload-refill-rate: 100
+
+
+# ---- JWT for Testing ----
+secreteJwtString: test-jwt-key
