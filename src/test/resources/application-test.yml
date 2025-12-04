@@ -91,4 +91,4 @@ rate:
 
 
 # ---- JWT for Testing ----
-secreteJwtString: test-jwt-key
+secreteJwtString: food123456789app123456789food123456789app123456789
