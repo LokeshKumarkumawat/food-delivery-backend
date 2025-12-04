@@ -26,15 +26,19 @@ spring:
   # ---- Redis for Testing ----
   redis:
     host: localhost
-    port: 6370    # test Redis container OR local test port
+    port: 6379    # test Redis container OR local test port
 
   cache:
     type: redis
+    redis:
+      time-to-live: 600000
+
 
   # ---- Disable Security During Tests ----
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+
 
   # ---- Mock Email ----
   mail:
