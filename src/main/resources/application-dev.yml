@@ -1,5 +1,8 @@
 server:
   port: 8090
+  url: http://localhost:8090
+  prod:
+    url: https://api.foodapp.com
 
 
 spring:
@@ -100,3 +103,30 @@ rate:
     upload-capacity: 10
     upload-refill-rate: 10
 
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    try-it-out-enabled: true
+    filter: true
+    syntax-highlight:
+      activated: true
+  show-actuator: false
+  packages-to-scan: com.bytebyteboot.foodapp
+  paths-to-match: /api/**
+
+# Application Info
+app:
+  name: Food Delivery API
+  version: 1.0.0
+  description: Complete Food Delivery Management System
+
+# Disable Swagger in Production (optional)
+# springdoc:
+#   swagger-ui:
+#     enabled: false
