@@ -12,6 +12,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.core.GrantedAuthorityDefaults;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -36,8 +37,13 @@ public class SecurityFilter {
                 .exceptionHandling(ex ->
                         ex.accessDeniedHandler(customAccessDenialHandler).authenticationEntryPoint(customAuthenticationEntryPoint))
                 .authorizeHttpRequests(req ->
-                        req.requestMatchers("/api/auth/**", "/api/categories/**", "/api/menu/**", "/api/reviews/**", "/internal/debug/ratelimit/buckets").permitAll()
-                                .anyRequest().authenticated())
+                        req.requestMatchers("/api/auth/**", "/api/categories/**", "/api/menu/**", "/api/reviews/**", "/internal/debug/ratelimit/buckets").permitAll())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/swagger-ui/**", "/api-docs/**").hasRole("ADMIN")  // Only admins can access
+                )
+                .authorizeHttpRequests(auth ->
+                        auth.anyRequest().authenticated()
+                )
                 .sessionManagement(mag -> mag.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(authFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -47,6 +53,15 @@ public class SecurityFilter {
     @Bean
     public PasswordEncoder passwordEncoder(){
         return new BCryptPasswordEncoder();
+    }
+
+//    This tells Spring:
+//    Do NOT add "ROLE_" prefix to roles.
+//    Accept roles exactly as ADMIN, CUSTOMER.
+
+    @Bean
+    public GrantedAuthorityDefaults grantedAuthorityDefaults() {
+        return new GrantedAuthorityDefaults(""); // REMOVE ROLE_ prefix
     }
 
     @Bean
