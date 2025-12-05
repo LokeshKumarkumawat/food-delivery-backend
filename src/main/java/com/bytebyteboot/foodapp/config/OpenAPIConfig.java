@@ -18,7 +18,7 @@ import java.util.List;
 @Configuration
 public class OpenAPIConfig {
 
-    @Value("${app.version:1.0.0}")
+    @Value("${app.version:1.1.0}")
     private String appVersion;
 
     @Value("${app.name:Food Delivery API}")

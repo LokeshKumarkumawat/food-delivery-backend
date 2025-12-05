@@ -123,7 +123,7 @@ springdoc:
 # Application Info
 app:
   name: Food Delivery API
-  version: 1.0.0
+  version: 1.1.0
   description: Complete Food Delivery Management System
 
 # Disable Swagger in Production (optional)
