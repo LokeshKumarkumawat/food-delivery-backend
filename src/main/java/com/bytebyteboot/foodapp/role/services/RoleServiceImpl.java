@@ -9,6 +9,8 @@ import com.bytebyteboot.foodapp.role.repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +27,7 @@ public class RoleServiceImpl implements RoleService {
 
 
     @Override
+    @CacheEvict(value = "roles", allEntries = true)
     public Response<RoleDTO> createRole(RoleDTO roleDTO) {
 
         Role role = modelMapper.map(roleDTO, Role.class);
@@ -39,6 +42,7 @@ public class RoleServiceImpl implements RoleService {
     }
 
     @Override
+    @CacheEvict(value = "roles", allEntries = true)
     public Response<RoleDTO> updateRole(RoleDTO roleDTO) {
 
         Role existingRole = roleRepository.findById(roleDTO.getId())
@@ -60,6 +64,7 @@ public class RoleServiceImpl implements RoleService {
     }
 
     @Override
+    @Cacheable(value = "roles", key = "'all'")
     public Response<List<RoleDTO>> getAllRoles() {
         List<Role> roles = roleRepository.findAll();
         List<RoleDTO> roleDTOS = roles.stream()
@@ -75,6 +80,7 @@ public class RoleServiceImpl implements RoleService {
     }
 
     @Override
+    @CacheEvict(value = "roles", allEntries = true)
     public Response<?> deleteRole(Long id) {
         if (!roleRepository.existsById(id)) {
             throw new NotFoundException("Role does not exists");

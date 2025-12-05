@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeToken;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -47,6 +49,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Cacheable(value = "users", key = "'all'")
     public Response<List<UserDTO>> getAllUsers() {
 
         log.info("INSIDE getAllUsers()");
@@ -63,6 +66,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Cacheable(value = "userAccount", key = "#root.target.getCurrentLoggedInUser().id")
     public Response<UserDTO> getOwnAccountDetails() {
 
         log.info("INSIDE getOwnAccountDetails()");
@@ -80,6 +84,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @CacheEvict(value = {"users", "userAccount"}, allEntries = true)
     public Response<?> updateOwnAccount(UserDTO userDTO) {
 
         log.info("INSIDE updateOwnAccount()");
@@ -146,6 +151,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @CacheEvict(value = {"users", "userAccount"}, allEntries = true)
     public Response<?> deactivateOwnAccount() {
 
         log.info("INSIDE deactivateOwnAccount()");
