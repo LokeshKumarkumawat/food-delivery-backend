@@ -3,8 +3,10 @@
 
     <property name="APP_NAME" value="FoodApp"/>
     <property name="LOG_PATH" value="logs/${APP_NAME}"/>
+
+    <!-- ⭐ Add correlation IDs -->
     <property name="LOG_PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"/>
+              value="%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} [%X{traceId:-} %X{spanId:-}] - %msg%n"/>
 
     <!-- File with rotation -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">

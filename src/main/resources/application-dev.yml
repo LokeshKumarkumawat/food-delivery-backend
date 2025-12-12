@@ -169,3 +169,8 @@ management:
       export:
         otlp:
           endpoint: http://localhost:4318/v1/traces
+
+    logging:
+      export:
+        otlp:
+          endpoint: http://localhost:4318/v1/logs
