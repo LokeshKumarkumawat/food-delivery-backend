@@ -1,0 +1,56 @@
+# Default deny, then allow only what is needed. Without a NetworkPolicy every
+# pod in the cluster can reach every other pod, so one compromised sidecar can
+# talk straight to your database.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: foodapp-default-deny
+  namespace: foodapp
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: foodapp-allow
+  namespace: foodapp
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: foodapp
+  policyTypes: [Ingress, Egress]
+
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - port: 8090
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: observability
+      ports:
+        - port: 9090
+
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mysql
+      ports:
+        - port: 3306
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+      ports:
+        - port: 6379
+    # DNS, and outbound HTTPS for Stripe, S3 and SMTP
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 443
+        - port: 587

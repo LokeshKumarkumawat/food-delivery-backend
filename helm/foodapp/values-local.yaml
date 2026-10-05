@@ -1,0 +1,48 @@
+# Local kind cluster. Only what differs from values.yaml.
+
+image:
+  repository: food-delivery-backend
+  tag: v3
+  pullPolicy: IfNotPresent
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: null
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  hosts:
+    - host: api.foodapp.localhost
+      paths:
+        - path: /
+          pathType: Prefix
+
+config:
+  SPRING_PROFILES_ACTIVE: "dev"
+  SPRING_DATASOURCE_URL: "jdbc:mysql://foodapp-mysql.foodapp.svc.cluster.local:3306/foodapp?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata"
+  SPRING_DATA_REDIS_HOST: "foodapp-redis-master.foodapp.svc.cluster.local"
+  SPRING_DATA_REDIS_PORT: "6379"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.observability.svc.cluster.local:4318"
+  MANAGEMENT_OTLP_METRICS_EXPORT_URL: "http://otel-collector.observability.svc.cluster.local:4318/v1/metrics"
+  MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"
+  MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT: "http://otel-collector.observability.svc.cluster.local:4318/v1/logs"
+
+
+
+probes:
+  startup:
+    timeoutSeconds: 3
+    failureThreshold: 60
+
+networkPolicy:
+  enabled: true
+  defaultDeny: true
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: traefik

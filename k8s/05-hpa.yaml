@@ -1,0 +1,52 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: foodapp
+  namespace: foodapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: foodapp
+
+  minReplicas: 2          # two, not one -- one replica has no availability
+  maxReplicas: 10
+
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70      # % of the *request*, not the limit
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+  # The behaviour block is what stops thrashing. Without it the HPA scales up
+  # and down every 15 seconds under spiky load, and pods spend their lives
+  # starting and dying.
+  behavior:
+    scaleUp:
+      # React fast: traffic is already arriving.
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Percent
+          value: 100              # at most double
+          periodSeconds: 30
+        - type: Pods
+          value: 4                # or add 4 pods
+          periodSeconds: 30
+      selectPolicy: Max
+
+    scaleDown:
+      # React slowly: a dip might be a lull, and a JVM takes 30s to replace.
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+      selectPolicy: Min

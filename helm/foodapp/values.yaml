@@ -1,0 +1,105 @@
+# Defaults. Environment files override only what differs -- see
+# values-prod.yaml. Everything here should be safe for a local cluster.
+
+replicaCount: 2
+
+image:
+  repository: ACCOUNT.dkr.ecr.ap-south-1.amazonaws.com/food-delivery-backend
+  tag: ""                 # defaults to .Chart.AppVersion; CI sets it explicitly
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/foodapp-s3-access
+
+service:
+  type: ClusterIP
+  port: 8090
+  managementPort: 9090
+
+ingress:
+  enabled: false
+  className: alb
+  annotations: {}
+  hosts:
+    - host: api.foodapp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+probes:
+  startup:
+    periodSeconds: 5
+    failureThreshold: 30
+  readiness:
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  liveness:
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+config:
+  SPRING_PROFILES_ACTIVE: prod
+  SERVER_PORT: "8090"
+  MANAGEMENT_SERVER_PORT: "9090"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+  OTEL_SERVICE_NAME: food-delivery-backend
+
+# Name of a pre-existing Secret holding credentials. The chart never creates
+# secrets -- they come from External Secrets or Sealed Secrets.
+existingSecret: foodapp-secrets
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: /actuator/prometheus
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Subcharts, for a self-contained local install. Off in production, where
+# MySQL is RDS and Redis is ElastiCache.
+mysql:
+  enabled: false
+redis:
+  enabled: false
