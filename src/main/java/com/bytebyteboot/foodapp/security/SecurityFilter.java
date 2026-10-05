@@ -37,7 +37,10 @@ public class SecurityFilter {
                 .exceptionHandling(ex ->
                         ex.accessDeniedHandler(customAccessDenialHandler).authenticationEntryPoint(customAuthenticationEntryPoint))
                 .authorizeHttpRequests(req ->
-                        req.requestMatchers("/api/auth/**", "/api/categories/**", "/api/menu/**", "/api/reviews/**", "/internal/debug/ratelimit/buckets").permitAll())
+                        req.requestMatchers(
+                                "/api/auth/**", "/api/categories/**", "/api/menu/**", "/api/reviews/**",
+                                "/internal/debug/ratelimit/buckets",
+                                "/actuator/health/liveness", "/actuator/health/readiness").permitAll())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/swagger-ui/**", "/api-docs/**").hasRole("ADMIN")  // Only admins can access
                 )
