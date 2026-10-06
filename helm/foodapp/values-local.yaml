@@ -31,6 +31,8 @@ config:
   MANAGEMENT_OTLP_METRICS_EXPORT_URL: "http://otel-collector.observability.svc.cluster.local:4318/v1/metrics"
   MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT: "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"
   MANAGEMENT_OPENTELEMETRY_LOGGING_EXPORT_OTLP_ENDPOINT: "http://otel-collector.observability.svc.cluster.local:4318/v1/logs"
+  SPRING_REDIS_HOST: "foodapp-redis-master.foodapp.svc.cluster.local"
+  SPRING_REDIS_PORT: "6379"
 
 
 

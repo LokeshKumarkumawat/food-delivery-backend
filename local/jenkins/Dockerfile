@@ -23,3 +23,8 @@ RUN curl -fsSL -o /usr/local/bin/kubectl https://dl.k8s.io/release/v1.33.4/bin/l
 RUN git config --system --add safe.directory '*'
 
 RUN jenkins-plugin-cli --plugins workflow-aggregator git pipeline-stage-view
+
+# BuildKit: shares the host Docker's layer cache. The legacy builder cannot.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends docker-buildx-plugin \
+ && rm -rf /var/lib/apt/lists/*
