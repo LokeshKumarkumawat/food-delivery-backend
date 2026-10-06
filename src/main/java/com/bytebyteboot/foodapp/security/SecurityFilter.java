@@ -40,10 +40,11 @@ public class SecurityFilter {
                         req.requestMatchers(
                                 "/api/auth/**", "/api/categories/**", "/api/menu/**", "/api/reviews/**",
                                 "/internal/debug/ratelimit/buckets",
-                                "/actuator/health/liveness", "/actuator/health/readiness").permitAll())
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/swagger-ui/**", "/api-docs/**").hasRole("ADMIN")  // Only admins can access
-                )
+                                "/actuator/health/liveness", "/actuator/health/readiness", "/swagger-ui/**", "/swagger-ui.html", "/api-docs/**").permitAll())
+//                .authorizeHttpRequests(auth -> auth
+//                        .requestMatchers("/swagger-ui/**", "/api-docs/**").hasRole("ADMIN")  // Only admins can access
+//                )
+
                 .authorizeHttpRequests(auth ->
                         auth.anyRequest().authenticated()
                 )
