@@ -1,277 +1,263 @@
-<div align="center">
+# Food Delivery Backend on Kubernetes (Spring Boot + Helm + Jenkins)
 
-# Food Delivery Backend
+I took a Spring Boot food delivery backend and learned how to run it properly: Docker, Kubernetes, Helm and Jenkins.
+Everything here ran on my own laptop (Docker Desktop + kind). The screenshots are real, from my own runs.
 
-**Production-grade REST API for a food ordering platform — Spring Boot 4, Kubernetes, full observability.**
+A simple way I think about it: the cluster is a building, each namespace is a floor, pods are the staff, and the Deployment is the manager who keeps the right number of staff on duty.
 
-[![Build](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/YOUR_USERNAME/food-delivery-backend/actions)
-[![Java](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/projects/jdk/21/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.0-6DB33F)](https://spring.io/projects/spring-boot)
-[![Kubernetes](https://img.shields.io/badge/Kubernetes-EKS-326CE5)](https://aws.amazon.com/eks/)
-[![Tests](https://img.shields.io/badge/tests-50%20passing-brightgreen)](docs/TESTING.md)
-[![License](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE)
+![Cluster overview, Helm revision 7](docs/images/01-cluster-overview.png)
 
-[Architecture](#architecture) · [Screenshots](#screenshots) · [Run it](#run-it-in-two-minutes) · [CI/CD](#cicd-pipeline) · [Docs](#documentation)
+## What I used
 
-</div>
-
----
-
-<p align="center">
-  <img src="docs/images/architecture.png" width="820" alt="System architecture">
-</p>
-
-## What this is
-
-A backend for a food delivery service: browse menus, build a cart, check out,
-pay through Stripe, track the order, review what you ate.
-
-The interesting part is not the CRUD. It is everything around it — the schema is
-versioned, the cache invalidates correctly, the API is rate-limited per endpoint
-tier, every request is traceable end to end, and the whole thing deploys to
-Kubernetes through a Jenkins pipeline that will not ship an image with a
-critical CVE in it.
-
-| | |
+| Part | Tools |
 |---|---|
-| **~40** REST endpoints | **13** Flyway migrations |
-| **50** automated tests across 5 layers | **92** Postman requests incl. a security regression suite |
-| **p99 95 ms** on the order endpoint | **2 → 10** pods under autoscaling |
+| App | Java 21, Spring Boot 4.0.0, Spring Security (JWT), JPA, Flyway, Redis cache, rate limiting, Swagger |
+| Data | MySQL 8.4 (on a volume), Redis 7.4 |
+| Container | Multi-stage Dockerfile, small Alpine JRE image, non-root user |
+| Kubernetes (kind) | Deployment, Service, ConfigMap, Secret, PVC, HPA, PodDisruptionBudget, Ingress (Traefik), NetworkPolicy, metrics-server |
+| Packaging | Helm chart with local and production values |
+| CI/CD | Jenkins pipeline as code |
+| Tracing | OpenTelemetry into Grafana Tempo |
 
----
+## What the app does
 
-## Screenshots
+Login and roles, categories, menu, cart, orders, payments (Stripe), reviews, notifications. Swagger UI documents the API.
+This repo is about the part I worked on: running that app well. The Dockerfile, the Kubernetes setup, the Helm chart, the Jenkins pipelines and the tracing.
 
-<table>
-<tr>
-<td width="50%">
+## How it fits together
 
-**Jenkins pipeline**
-<img src="docs/images/jenkins-pipeline.png" alt="Jenkins pipeline stage view">
-Build → test → scan → push to ECR → deploy to EKS.
+```mermaid
+flowchart LR
+  C[Client] --> T[Traefik Ingress<br/>api.foodapp.localhost]
+  subgraph kind[kind cluster, namespace foodapp]
+    T --> S[Service foodapp]
+    S --> P1[Pod 1]
+    S --> P2[Pod 2]
+    P1 --> M[(MySQL + volume)]
+    P2 --> M
+    P1 --> R[(Redis)]
+    P2 --> R
+    H[HPA 2 to 3 pods] -.scales.-> P1
+  end
+  P1 -.traces.-> G[Grafana Tempo]
+  J[Jenkins in Docker] -->|build image, helm upgrade --atomic| kind
+```
 
-</td>
-<td width="50%">
+## What I did, step by step
 
-**Distributed tracing**
-<img src="docs/images/grafana-trace.png" alt="Grafana trace waterfall">
-One checkout request, every span, where the time went.
+### 1. Put the app in a container
 
-</td>
-</tr>
-<tr>
-<td width="50%">
+![Spring Boot startup](docs/images/09-springboot-startup.png)
 
-**Autoscaling under load**
-<img src="docs/images/hpa-scaling.gif" alt="HPA scaling pods during a load test">
-CPU crosses 70%, the HPA adds pods, latency recovers.
+The app starts in about 42 seconds with the `dev` profile, and the readiness check says `UP`.
 
-</td>
-<td width="50%">
+![Docker image](docs/images/10-docker-image.png)
 
-**API documentation**
-<img src="docs/images/swagger.png" alt="Swagger UI">
-OpenAPI 3, generated from the code.
+The image uses a multi-stage build: Maven builds the app, and only a small JRE is kept in the final image (187 MB of content, 527 MB on disk).
 
-</td>
-</tr>
-</table>
+### 2. Run it on Kubernetes
+
+| Cluster and workloads | Autoscaling and storage |
+|---|---|
+| ![overview](docs/images/01_cluster_overview.png) | ![hpa and pvc](docs/images/06-hpa-pvc.png) |
+
+Two-node cluster, 2 app pods, a service, HPA, PodDisruptionBudget, Ingress and NetworkPolicies.
+The picture at the top is from earlier (Helm revision 7). The one on the left here is the same view later (revision 12), after more releases.
+On the right: the HPA at 12% of its 70% CPU target, live CPU and memory per pod, and the MySQL volume (2 Gi, `Bound`).
+
+### 3. See it heal itself
+
+![delete a pod](docs/images/03-self-heal-1.png)
+
+![new pod appears](docs/images/03-self-heal-2.png)
+
+I deleted one app pod. The Deployment started a new one while the other pod kept running.
+On my laptop the app takes 40 to 100 seconds to become Ready.
+
+<!--
+UNCOMMENT THIS BLOCK ONLY AFTER A VALID RE-RUN.
+1. Run local\zero-downtime.cmd (the fixed version).
+2. In the final pod list, one pod must be new (young age). If both pods keep their old age, no pod was deleted and the run is not valid.
+3. Save the screenshot as docs/images/04-zero-downtime-rerun.png
+4. Fill in the real numbers below, then remove the comment markers.
+
+#### Requests keep working while a pod is replaced
+
+![zero downtime](docs/images/04-zero-downtime-rerun.png)
+
+A loop sent one request per second through the Ingress for 40 seconds. At second 8 I deleted one app pod.
+Result: X of 40 requests returned 200 (fill in from your run).
+-->
+
+
+### 4. Release safely with Helm
+
+| A bad image: the new pod cannot start | Helm rolls the release back |
+|---|---|
+| ![bad image pods](docs/images/05-atomic-rollback-2.png) | ![atomic error](docs/images/05-atomic-rollback-1.png) |
+
+I deployed an image tag that does not exist, on purpose. The old pods stayed `1/1` the whole time. Because I used `--atomic`, Helm rolled the release back by itself.
+Helm keeps every deploy as a numbered revision. I did this test twice, and both are in the history.
+
+**First try (revisions 1 to 7):** revision 2 failed, revision 3 is the automatic `Rollback to 1`.
+
+![helm history, first try](docs/images/02-helm-history.png)
+
+**Later (revisions 7 to 12):** revisions 9 and 11 failed, and revisions 10 and 12 are the rollbacks.
+
+![helm history, later](docs/images/05-atomic-rollback-3.png)
+
+### 5. Traffic and security
+
+| A request through the Ingress | NetworkPolicy test |
+|---|---|
+| ![ingress](docs/images/07-ingress.png) | ![network policy](docs/images/08-networkpolic.png) |
+
+Left: `GET /api/categories/all` goes through Traefik and returns 200, with rate-limit headers and a trace id.
+Right: with no policy the call works (200). With default-deny it fails. With an allow rule, only pods labelled `role=client` get through.
+
+### 6. Jenkins
+
+![stage view](docs/images/jenkin-4.png)
+
+| Pipeline graph, run #5 | Console |
+|---|---|
+| ![pipeline graph](docs/images/jenkins-1.png) | ![console](docs/images/jenkins-2.png) |
+
+The pipeline checks out the code, lints the Helm chart, builds the image, loads it into kind, runs `helm upgrade --install --atomic`, then smoke-tests the readiness endpoint. Unit tests are an optional stage (off by default).
 
 <details>
-<summary><b>More screenshots</b></summary>
+<summary>My Jenkins runs, including the ones that failed</summary>
 
-<br>
+![job list](docs/images/jenkins-3.png)
 
-**Grafana dashboard** — orders placed, payment failure rate, p50/p95/p99 latency
-<img src="docs/images/grafana-dashboard.png" width="100%">
+![run history](docs/images/jenkin-5.png)
 
-**Test suite** — 50 tests across five layers
-<img src="docs/images/tests.png" width="100%">
-
-**Postman security regression suite** — each request reproduces a finding from the self-audit
-<img src="docs/images/postman-security.png" width="100%">
-
-**Trivy scan** — the pipeline fails on any HIGH or CRITICAL CVE
-<img src="docs/images/trivy.png" width="100%">
-
-**Load test** — k6, 50 virtual users, before and after the fetch-strategy fix
-<img src="docs/images/k6-results.png" width="100%">
+| Run | Result | What happened |
+|---|---|---|
+| #1 | Failed after 1 s | The job was not yet pointed at my repository |
+| #2 | Aborted at 30 min | Cold cache and a slow image build hit my timeout |
+| #3 | Success (20 min) | First full run. Build image took 10 min 14 s |
+| #4 | Failed in Unit tests | I switched tests on once. They failed after 7 min 12 s. I have not looked into it yet |
+| #5 | Success (5 min 13 s) | Layers were cached, so Build image took 16 s |
 
 </details>
 
----
+### 7. See what the app is doing
 
-## Architecture
-
-```
-                        ┌──────────────────────────────────┐
-   Client ──── ALB ────►│  Spring Boot API   (2-10 pods)   │
-                        │  Java 21 · Spring Boot 4.0       │
-                        └───┬──────┬──────┬──────┬─────────┘
-                            │      │      │      │
-                   ┌────────┘      │      │      └────────┐
-                   ▼               ▼      ▼               ▼
-              RDS MySQL      ElastiCache  Stripe      OTLP → Grafana
-              (Flyway)        (Redis)     S3 / SMTP    LGTM stack
-```
-
-Packaged **by feature**, not by layer. Each module owns its controller, service,
-repository, entity and DTOs, so a change to carts touches one directory.
-
-```
-auth_users · role · category · menu · cart · order
-payment · review · email_notification · ratelimiter
-```
-
-Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
----
-
-## Engineering decisions worth reading
-
-Not a feature list — the choices that were hard, with the alternatives that lost.
-
-| Decision | Why it mattered |
+| A trace in Grafana Tempo | Swagger UI through the Ingress |
 |---|---|
-| [Stripe webhooks as the payment trust boundary](docs/adr/0002-payment-confirmation-trust-boundary.md) | The browser told the API when payment succeeded. It should never have been asked. |
-| [Rate-limit state in Redis, not in memory](docs/adr/0003-distributed-rate-limiting.md) | In-memory buckets mean the limit multiplies by replica count — weakest exactly when under load. |
-| [One restaurant per cart](docs/adr/0004-single-restaurant-cart.md) | Two kitchens, two prep times, one courier. The food arrives cold. |
-| [Why record decisions at all](docs/adr/0001-record-architecture-decisions.md) | Code shows what was decided. Only an ADR shows what else was on the table. |
+| ![trace](docs/images/11-grafana-trace.png) | ![swagger](docs/images/swagger-1.png) |
 
-I also [audited my own code](docs/audit/) and published the findings — severity,
-reproduction steps, and fix for each. Every security finding has a Postman
-request that reproduces it, kept as a regression suite.
+## Things that broke and how I fixed them
 
----
-
-## Run it in two minutes
-
-```bash
-git clone https://github.com/YOUR_USERNAME/food-delivery-backend.git
-cd food-delivery-backend
-
-cp .env.example .env        # fill in your own keys
-docker compose up -d        # MySQL, Redis, Grafana LGTM
-./mvnw spring-boot:run      # Flyway builds the schema on first boot
-```
-
-| | |
-|---|---|
-| API | http://localhost:8090 |
-| Swagger UI | http://localhost:8090/swagger-ui.html |
-| Grafana | http://localhost:3000 |
-
-**On Kubernetes:**
-
-```bash
-helm upgrade --install foodapp ./helm/foodapp \
-  --namespace foodapp --create-namespace \
-  --set image.tag=1.0.0 --atomic --wait
-```
-
----
-
-## CI/CD pipeline
-
-```
- Checkout ─► Build & test ─► ┌ Dependency CVE scan ┐ ─► Build image ─►
-                             └ Static analysis     ┘
- ─► Trivy scan ─► Push to ECR ─► Helm deploy to EKS ─► Smoke test
-```
-
-Four things in there that are deliberate:
-
-- **Image tags are immutable** — `${BUILD_NUMBER}-${GIT_SHA}`, never `latest`.
-  You cannot roll back to a tag that keeps moving.
-- **Scanning happens before the push**, so a vulnerable image never reaches the
-  registry at all.
-- **`helm upgrade --atomic`** rolls back automatically on a failed deploy.
-  Recovery is not a manual step at 2am.
-- **The quality gates run in parallel**, because they do not depend on each other.
-
-[`Jenkinsfile`](Jenkinsfile) · [`Dockerfile`](Dockerfile) · [`helm/`](helm/)
-
----
-
-## Kubernetes
-
-| Concern | How |
-|---|---|
-| **Startup** | `startupProbe` gives the JVM 150s to boot, so the liveness probe can stay aggressive afterwards |
-| **Health** | Separate `liveness` and `readiness` — a Redis blip drains traffic, it does not restart the pod |
-| **Scaling** | HPA 2→10 on CPU, with a `behavior` block: fast scale-up, 5-minute scale-down window to stop thrashing |
-| **Availability** | PodDisruptionBudget, zone spread, `maxUnavailable: 0` on rolling updates |
-| **Shutdown** | `preStop` sleep so the load balancer stops routing before the JVM exits — no dropped requests on deploy |
-| **Security** | Non-root, read-only root filesystem, all capabilities dropped, default-deny NetworkPolicy |
-| **AWS access** | IRSA — the pod assumes an IAM role. There is no access key to leak or rotate. |
-
-[`k8s/`](k8s/) for readable manifests · [`helm/foodapp/`](helm/foodapp/) for the chart that actually ships
-
----
-
-## Tech stack
-
-| | |
-|---|---|
-| **Runtime** | Java 21, Spring Boot 4.0 |
-| **Data** | MySQL 8, Spring Data JPA, Flyway |
-| **Cache** | Redis 7.4, per-cache TTL policy |
-| **Security** | Spring Security, JWT, BCrypt, Bucket4j rate limiting |
-| **Integrations** | Stripe, AWS S3, SMTP + Thymeleaf |
-| **Observability** | OpenTelemetry, Grafana LGTM, Micrometer |
-| **Testing** | JUnit 5, Mockito, MockMvc, REST Assured, Testcontainers |
-| **Infra** | Docker, Kubernetes, Helm, Jenkins, AWS ECR + EKS |
-
----
-
-## Testing
-
-Five kinds of test, each catching what the others cannot.
-
-| Layer | Tool | Catches |
+| What broke | Why | How I fixed it |
 |---|---|---|
-| Unit | Mockito | Business rule errors |
-| Repository | `@DataJpaTest` | Broken queries |
-| Controller | MockMvc | Wrong routes, missing auth |
-| End to end | REST Assured | Integration failures |
-| Infrastructure | Testcontainers | Real Redis behaviour |
+| Pod in `CrashLoopBackOff`: `ClassNotFoundException: JarLauncher` | My Dockerfile started the old Spring Boot launcher, but the layered JAR runs with `java -jar` | Renamed the JAR to `application.jar` and changed the `ENTRYPOINT` |
+| Pod crashed on Flyway: failed migration to version 3 | `baseline-on-migrate` skipped V1 because a test table of mine made the database non-empty | Read `logs --previous`, reset the dev database, migrations ran cleanly |
+| Pod `Running` but never `Ready` | Spring Security answered the Kubernetes probes with 401 | Opened only `/actuator/health/liveness` and `/readiness`. Everything else stays protected |
+| Which Ingress controller to use | `ingress-nginx` was retired in March 2026 ([Kubernetes statement](https://www.kubernetes.io/blog/2026/01/29/ingress-nginx-statement/)) | Used Traefik |
+| Jenkins build hit the 30 minute limit (run #2) | Cold cache with the old Docker builder, and the Grafana stack was using a lot of CPU | Added BuildKit to the Jenkins image, raised the timeout to 60 min, scaled Grafana to zero during builds. Run #3 still took 10 min 14 s (cold cache). Run #5 reused the layers: 16 s |
+| Files landed in the wrong folder | Git Bash treats `\` as an escape character | One terminal at a time, and `/` in Git Bash paths |
+
+## Run it yourself
+
+You need Docker Desktop (about 6 GB of RAM for it), `kind`, `kubectl` and `helm`. I used Windows. These are the steps I ran, in this order. I have not replayed them on a clean machine.
 
 ```bash
-./mvnw verify
-newman run postman/FoodDeliveryBackend.postman_collection.json
+# 1. cluster
+kind create cluster --name foodapp --config kind-config.yaml
+kubectl label node foodapp-control-plane ingress-ready=true
+kubectl apply -f k8s/00-namespace.yaml
+
+# 2. secret (dummy values, this file is git-ignored)
+#    keys: SECRETE_JWT_STRING, DB_USERNAME, DB_PASSWORD, MAIL_USERNAME, MAIL_PASSWORD,
+#          AWS_ACCESS_KEY_ID, AWS_SECRET_KEY, STRIPE_PUBLIC_KEY, STRIPE_SECRET_KEY
+kubectl create secret generic foodapp-secrets --from-env-file=local/foodapp-secrets.env -n foodapp
+
+# 3. MySQL and Redis
+kubectl apply -f local/deps/redis.yaml -f local/deps/mysql.yaml
+
+# 4. ingress controller and metrics
+helm repo add traefik https://traefik.github.io/charts
+helm install traefik traefik/traefik -n traefik --create-namespace -f local/traefik-values.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+kubectl patch deployment metrics-server -n kube-system --type=json \
+  -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+
+# 5. build the image, load it into kind, install the Helm chart (Windows)
+local\deploy-local.cmd
+
+# 6. NetworkPolicies for MySQL and Redis
+kubectl apply -f local/deps/netpol-deps.yaml
 ```
 
-[docs/TESTING.md](docs/TESTING.md)
+Try it:
 
----
+```bash
+curl -H "Host: api.foodapp.localhost" http://localhost/api/categories/all
+# Swagger UI: http://api.foodapp.localhost/swagger-ui/index.html
+```
 
-## Documentation
+Optional tracing: `kubectl apply -f local/deps/otel-lgtm.yaml`, then
+`kubectl port-forward -n observability svc/otel-collector 3001:3000` and open Grafana on port 3001.
+It uses a lot of CPU and memory, so I keep it scaled to zero when I do not need it.
 
-| | |
-|---|---|
-| [HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md) | Plain-English tour of the five most interesting parts |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Module map, request lifecycle |
-| [DATA-MODEL.md](docs/DATA-MODEL.md) | Entities, migrations, indexing |
-| [API.md](docs/API.md) | Endpoint reference |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Docker → ECR → EKS → Helm, end to end |
-| [TESTING.md](docs/TESTING.md) | Test strategy |
-| [OPERATIONS.md](docs/OPERATIONS.md) | Config, observability, runbook |
-| [ROADMAP.md](docs/ROADMAP.md) | What's next and why |
-| [audit/](docs/audit/) | Self-audit findings with remediation status |
-| [adr/](docs/adr/) | Architecture decision records |
+<details>
+<summary>Run Jenkins locally in Docker</summary>
 
----
+```bash
+docker build -t jenkins-local -f local/jenkins/Dockerfile local/jenkins
+docker run -d --name jenkins-local --user root --network kind -p 8081:8080 \
+  -v jenkins_home:/var/jenkins_home -v /var/run/docker.sock:/var/run/docker.sock \
+  -v "<path-to-this-repo>:/repo:ro" \
+  -e JAVA_OPTS="-Xmx512m -Dhudson.plugins.git.GitSCM.ALLOW_LOCAL_CHECKOUT=true" jenkins-local
+```
 
-## Contact
+Create a Pipeline job: "Pipeline script from SCM", Git, repository `file:///repo`, branch `*/develop`, script path `Jenkinsfile.local`.
+This mounts the Docker socket and runs as root, so use it on a laptop only.
 
-**Your Name** — Backend Engineer, Pune
-[LinkedIn](https://linkedin.com/in/YOUR_PROFILE) · [Email](mailto:you@example.com)
+</details>
 
-Happy to walk through any of it. The payment trust boundary is the most
-interesting conversation in here.
+## Folders
 
-<br>
+```
+.
+├── Dockerfile               multi-stage image build
+├── Jenkinsfile.local        the pipeline I ran: Jenkins in Docker, deploys to kind
+├── Jenkinsfile              AWS pipeline (ECR/EKS, Trivy, OWASP, Sonar): written, not run yet
+├── kind-config.yaml
+├── helm/foodapp/            Helm chart (templates, values.yaml, values-local.yaml, values-prod.yaml)
+├── k8s/                     plain manifests (for reference)
+├── local/
+│   ├── deploy-local.cmd     build, load into kind, helm upgrade --atomic, smoke test
+│   ├── deps/                MySQL, Redis, Grafana stack, NetworkPolicies for the dependencies
+│   ├── app/                 my earlier plain-YAML versions of the app resources
+│   ├── jenkins/Dockerfile   Jenkins image with docker, kubectl, helm and kind
+│   └── traefik-values.yaml
+├── docs/
+└── src/                     Spring Boot app
+```
 
-<div align="center">
-<sub>MIT licensed. Built to learn how production systems actually fit together.</sub>
-</div>
+## What is done and what is not
+
+**Done and tested on my laptop**
+- Containerised app, Kubernetes setup, Helm chart, Ingress, HPA, PodDisruptionBudget, NetworkPolicies for incoming traffic
+- Self-healing and automatic Helm rollback (screenshots above)
+- A Jenkins pipeline that built, deployed and smoke-tested the app (runs #3 and #5)
+- OpenTelemetry traces in Grafana Tempo
+
+**Not done yet**
+- Deploying to AWS (ECR and EKS). `Jenkinsfile` is written, but it has never run
+- `application-prod.yml` is empty, so the production profile cannot start yet
+- Unit tests in Jenkins: the stage exists, but the one run with tests on (#4) failed and I have not looked into it
+- NetworkPolicies cover incoming traffic only, no egress rules
+- MySQL and Redis are simple Deployments for local use. Production would use RDS and ElastiCache
+- Stripe, Gmail and S3 use dummy credentials locally, so those parts are not exercised
+
+## About me
+
+**Lokesh Kumar Kumawat**, Java / Spring Boot developer learning cloud-native delivery.
+GitHub: [LokeshKumarkumawat](https://github.com/LokeshKumarkumawat)
+LinkedIn: [LokeshKumarkumawat](https://www.linkedin.com/in/lokesh-kumawat/)
+Email: *lokeshkumawat0279@gmail.com*
