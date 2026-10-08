@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: foodapp
+  namespace: foodapp
+  labels:
+    app.kubernetes.io/name: foodapp
+    app.kubernetes.io/component: backend
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0        # never drop below the current replica count
+
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: foodapp
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: foodapp
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      serviceAccountName: foodapp
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+
+      # Spread replicas across availability zones so one AZ failing does not
+      # take the whole service with it.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: foodapp
+
+      containers:
+        - name: foodapp
+          image: ACCOUNT.dkr.ecr.ap-south-1.amazonaws.com/food-delivery-backend:TAG
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8090
+            - name: management
+              containerPort: 9090
+
+          envFrom:
+            - configMapRef:
+                name: foodapp-config
+            - secretRef:
+                name: foodapp-secrets
+
+          # Requests are what the scheduler reserves and what the HPA measures
+          # against. Without them the HPA cannot compute a utilisation
+          # percentage and simply does nothing.
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+              # No CPU limit on purpose. A CPU limit throttles the JVM during
+              # startup and GC for no benefit -- requests already guarantee the
+              # share. Memory has a limit because exceeding it is unrecoverable.
+
+          # Three probes, three different jobs.
+          #
+          # startupProbe   -- "has it finished booting?" A Spring Boot app takes
+          #                   20-40s. This gives it up to 150s while keeping the
+          #                   liveness probe aggressive afterwards. Without it
+          #                   you need a huge initialDelaySeconds on liveness,
+          #                   which delays crash detection forever.
+          startupProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            periodSeconds: 5
+            failureThreshold: 30
+
+          # readinessProbe -- "can it serve traffic right now?" Failing removes
+          #                   the pod from the Service endpoints. It is not
+          #                   restarted. Correct when Redis blips.
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: management
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+          # livenessProbe  -- "is it wedged?" Failing kills and restarts the
+          #                   container. Deliberately slower and more forgiving,
+          #                   because a wrong restart is worse than a late one.
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: management
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          lifecycle:
+            preStop:
+              # Give the load balancer time to stop sending new requests before
+              # the JVM starts shutting down. Without this you drop in-flight
+              # requests on every deploy.
+              exec:
+                command: ["sh", "-c", "sleep 10"]
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      # readOnlyRootFilesystem means the JVM needs somewhere writable for
+      # temp files.
+      volumes:
+        - name: tmp
+          emptyDir: {}
+
+      terminationGracePeriodSeconds: 45

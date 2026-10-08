@@ -33,3 +33,10 @@ build/
 .vscode/
 .env
 /logs
+
+local/*.env
+
+local/render-*.yaml
+
+local/practice/
+local/render-*.yaml

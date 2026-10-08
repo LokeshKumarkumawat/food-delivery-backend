@@ -1,0 +1,106 @@
+pipeline {
+    agent any
+
+    parameters {
+        booleanParam(name: 'RUN_TESTS', defaultValue: false,
+                     description: 'Run mvnw verify (tests may need Docker for Testcontainers)')
+    }
+
+    environment {
+        IMAGE         = 'food-delivery-backend'
+        KIND_CLUSTER  = 'foodapp'
+        HELM_RELEASE  = 'foodapp'
+        K8S_NAMESPACE = 'foodapp'
+        DOCKER_BUILDKIT = '1'
+    }
+
+    options {
+        timeout(time: 60, unit: 'MINUTES')
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        disableConcurrentBuilds()
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script {
+                    def sha = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                    env.IMAGE_TAG = "${env.BUILD_NUMBER}-${sha}"
+                    currentBuild.displayName = "#${env.BUILD_NUMBER} ${env.IMAGE_TAG}"
+                }
+            }
+        }
+
+        stage('Unit tests') {
+            when { expression { params.RUN_TESTS } }
+            steps {
+                sh 'sh mvnw -B clean verify'
+            }
+            post {
+                always {
+                    junit testResults: 'target/surefire-reports/*.xml', allowEmptyResults: true
+                }
+            }
+        }
+
+        stage('Helm lint') {
+            steps {
+                sh '''
+                    helm lint helm/foodapp -f helm/foodapp/values-local.yaml
+                    helm lint helm/foodapp -f helm/foodapp/values-prod.yaml
+                '''
+            }
+        }
+
+        stage('Build image') {
+            steps {
+                sh 'docker build -t ${IMAGE}:${IMAGE_TAG} .'
+            }
+        }
+
+        stage('Load into kind') {
+            steps {
+                sh 'kind load docker-image ${IMAGE}:${IMAGE_TAG} --name ${KIND_CLUSTER}'
+            }
+        }
+
+        stage('Deploy (helm atomic)') {
+            steps {
+                sh '''
+                    kind get kubeconfig --name ${KIND_CLUSTER} --internal > kubeconfig
+                    export KUBECONFIG=$PWD/kubeconfig
+                    helm upgrade --install ${HELM_RELEASE} helm/foodapp \
+                      -n ${K8S_NAMESPACE} \
+                      -f helm/foodapp/values-local.yaml \
+                      --set image.tag=${IMAGE_TAG} \
+                      --atomic --timeout 5m
+                '''
+            }
+        }
+
+        stage('Smoke test') {
+            steps {
+                sh '''
+                    export KUBECONFIG=$PWD/kubeconfig
+                    kubectl -n ${K8S_NAMESPACE} rollout status deployment/${HELM_RELEASE} --timeout=300s
+                    kubectl -n ${K8S_NAMESPACE} exec deploy/${HELM_RELEASE} -- \
+                      curl -fsS http://localhost:9090/actuator/health/readiness
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'rm -f kubeconfig || true'
+        }
+        success {
+            echo "Deployed ${IMAGE}:${env.IMAGE_TAG} to kind"
+        }
+        failure {
+            echo "Build ${env.BUILD_NUMBER} failed. Helm --atomic rolled the release back."
+        }
+    }
+}

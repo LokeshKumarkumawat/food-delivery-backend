@@ -1,0 +1,48 @@
+# Production overrides only. Anything not listed here comes from values.yaml.
+
+replicaCount: 3
+
+image:
+  pullPolicy: Always
+
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/foodapp-s3-access
+
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/healthcheck-port: "9090"
+    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health/readiness
+  hosts:
+    - host: api.foodapp.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    memory: 2Gi
+
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 65
+
+config:
+  SPRING_DATASOURCE_URL: jdbc:mysql://foodapp.cluster-xxxx.ap-south-1.rds.amazonaws.com:3306/foodapp?useSSL=true
+  SPRING_DATA_REDIS_HOST: foodapp.xxxx.ng.0001.aps1.cache.amazonaws.com
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector.observability.svc.cluster.local:4318
+  OTEL_TRACES_SAMPLER_ARG: "0.1"      # 100% sampling is a production outage
+
+mysql:
+  enabled: false
+redis:
+  enabled: false

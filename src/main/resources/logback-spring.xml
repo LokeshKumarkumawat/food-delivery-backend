@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
 
+    <!-- 🔥 Always include Spring Boot defaults -->
+    <include resource="org/springframework/boot/logging/logback/base.xml"/>
+    <!-- 🔶 OpenTelemetry Log Appender -->
+    <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender"/>
+
     <springProfile name="dev">
         <include resource="logback-dev.xml"/>
     </springProfile>
@@ -8,5 +13,10 @@
     <springProfile name="prod">
         <include resource="logback-prod.xml"/>
     </springProfile>
+
+    <!-- root logger → add OTEL appender to all profiles -->
+    <root level="INFO">
+        <appender-ref ref="OTEL"/>
+    </root>
 
 </configuration>

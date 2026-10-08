@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: foodapp
+  namespace: foodapp
+  labels:
+    app.kubernetes.io/name: foodapp
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: foodapp
+  ports:
+    - name: http
+      port: 8090
+      targetPort: http
+    - name: management
+      port: 9090
+      targetPort: management
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: foodapp
+  namespace: foodapp
+  annotations:
+    # IRSA: the pod assumes this IAM role for S3 access. No AWS_ACCESS_KEY_ID,
+    # no AWS_SECRET_KEY, nothing to leak or rotate. This is the proper fix for
+    # static AWS credentials in config.
+    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/foodapp-s3-access

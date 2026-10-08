@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: foodapp
+  namespace: foodapp
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-south-1:ACCOUNT:certificate/ID
+
+    # Health checks hit the management port, not the API port. The API port
+    # should not have to answer unauthenticated probe traffic.
+    alb.ingress.kubernetes.io/healthcheck-port: '9090'
+    alb.ingress.kubernetes.io/healthcheck-path: /actuator/health/readiness
+spec:
+  rules:
+    - host: api.foodapp.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: foodapp
+                port:
+                  name: http

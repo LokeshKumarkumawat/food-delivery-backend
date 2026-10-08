@@ -1,0 +1,31 @@
+{{- $np := .Values.networkPolicy | default dict }}
+{{- if $np.enabled }}
+{{- if $np.defaultDeny }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "foodapp.fullname" . }}-default-deny-ingress
+  labels:
+    {{- include "foodapp.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "foodapp.fullname" . }}-allow-ingress
+  labels:
+    {{- include "foodapp.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "foodapp.selectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        {{- required "networkPolicy.ingressFrom is required" $np.ingressFrom | toYaml | nindent 8 }}
+      ports:
+        - port: {{ .Values.service.port }}
+{{- end }}

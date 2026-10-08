@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: foodapp
+  namespace: foodapp
+spec:
+  # During a voluntary disruption -- a node drain, a cluster upgrade -- keep at
+  # least one pod serving. Without this, draining a node can take the whole
+  # service down even though the deployment "has" two replicas.
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: foodapp

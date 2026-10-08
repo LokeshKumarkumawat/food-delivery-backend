@@ -1,0 +1,31 @@
+{{ .Chart.Name }} {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}".
+
+Watch the rollout:
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "foodapp.fullname" . }}
+
+Check health (only the probe endpoints are open; /actuator/health needs auth):
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "foodapp.fullname" . }} 9090:9090
+  curl localhost:9090/actuator/health/readiness
+
+{{- if .Values.autoscaling.enabled }}
+
+Autoscaler ({{ .Values.autoscaling.minReplicas }}-{{ .Values.autoscaling.maxReplicas }} replicas at {{ .Values.autoscaling.targetCPUUtilizationPercentage }}% CPU):
+  kubectl -n {{ .Release.Namespace }} get hpa {{ include "foodapp.fullname" . }} --watch
+
+If TARGETS shows <unknown>, metrics-server is not installed.
+{{- end }}
+
+{{- if .Values.ingress.enabled }}
+
+Public URL:
+{{- range .Values.ingress.hosts }}
+  {{ $.Values.ingress.scheme | default "http" }}://{{ .host }}
+{{- end }}
+{{- else }}
+
+No ingress. Reach it locally with:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "foodapp.fullname" . }} 8090:8090
+{{- end }}
+
+Roll back:
+  helm rollback {{ .Release.Name }} -n {{ .Release.Namespace }}
